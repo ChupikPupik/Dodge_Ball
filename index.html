@@ -192,15 +192,26 @@ window.dobIsReady = () => _fbReady && _authReady && !!_myUid;
 window.dobMyUid   = () => _myUid;
 </script>
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{overflow:hidden;background:#000;font-family:Arial,sans-serif;width:100%;height:100%;}
+html,body{overflow:hidden;background:#05050a;font-family:'Sora',Arial,sans-serif;width:100%;height:100%;}
+
+body{
+  background:
+    radial-gradient(circle at 15% 15%, rgba(0,255,136,0.08), transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(255,68,68,0.08), transparent 45%),
+    radial-gradient(circle at 50% 50%, #101018, #05050a 80%);
+}
+
 #stage{
   position:fixed;top:0;left:0;width:100%;height:100%;
-  background:#111;
+  background:#0a0a10;
 }
 #gameWrap{
-  position:absolute;inset:0;background:#111;overflow:hidden;
+  position:absolute;inset:0;background:#0a0a10;overflow:hidden;
 }
 canvas{
   display:block;touch-action:none;-webkit-user-select:none;user-select:none;
@@ -208,21 +219,44 @@ canvas{
 }
 
 
-#ui{position:absolute;top:20px;left:20px;color:white;font-size:20px;font-weight:bold;pointer-events:none;z-index:10;}
-button{padding:15px 35px;font-size:22px;border:none;border-radius:12px;cursor:pointer;margin:10px;background:#333;color:#fff;transition:background .2s;}
-button:hover{background:#555;}
+#ui{
+  position:absolute;top:20px;left:20px;color:#eaf6ff;font-family:'Rajdhani',sans-serif;
+  font-size:20px;font-weight:600;pointer-events:none;z-index:10;letter-spacing:.5px;
+  background:rgba(10,12,20,0.45);padding:10px 16px;border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(6px);
+  text-shadow:0 0 12px rgba(0,255,136,0.25);
+}
+button{
+  padding:15px 35px;font-size:20px;font-weight:600;font-family:'Rajdhani',sans-serif;
+  letter-spacing:.5px;border:1px solid rgba(255,255,255,0.12);border-radius:12px;
+  cursor:pointer;margin:10px;color:#fff;
+  background:linear-gradient(145deg,#1c1c28,#121218);
+  box-shadow:0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease;
+}
+button:hover{
+  background:linear-gradient(145deg,#26263a,#181822);
+  border-color:rgba(0,255,136,0.35);
+  box-shadow:0 6px 20px rgba(0,255,136,0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+  transform:translateY(-2px);
+}
+button:active{transform:translateY(0);}
 
 #homeBtn{
   position:absolute;top:14px;left:50%;transform:translateX(-50%);
-  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
-  color:#aaa;font-size:12px;padding:5px 14px;border-radius:20px;
-  cursor:pointer;z-index:50;display:none;
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);
+  color:#bbb;font-size:12px;padding:6px 16px;border-radius:20px;
+  cursor:pointer;z-index:50;display:none;font-family:'Rajdhani',sans-serif;
+  letter-spacing:.5px;backdrop-filter:blur(6px);margin:0;
+  box-shadow:0 2px 10px rgba(0,0,0,0.3);
 }
-#homeBtn:hover{background:rgba(255,255,255,0.18);color:#fff;}
+#homeBtn:hover{background:rgba(255,255,255,0.16);color:#fff;border-color:rgba(0,255,136,0.4);transform:translateX(-50%);}
 
 #menu,#settings,#accountScreen,#leaderboardScreen,#onlineWait,#matchResult,#vsScreen,#winnerOverlay,#gameOver{
   position:absolute;inset:0;display:none;flex-direction:column;
-  justify-content:center;align-items:center;background:#111;color:white;z-index:30;
+  justify-content:center;align-items:center;
+  background:radial-gradient(circle at 50% 20%, #14141e, #08080c 75%);
+  color:#f0f0f5;z-index:30;
 }
 #menu {
   display: flex;              /* NEU: Zeigt das Menü standardmäßig beim Laden (ohne !important) */
@@ -237,14 +271,19 @@ button:hover{background:#555;}
 
 
 
-h1{font-size:50px;margin-bottom:20px;}
-h2{font-size:30px;margin-bottom:20px;}
-#gameOver{background:rgba(0,0,0,0.85);z-index:40;}
+h1{
+  font-size:56px;margin-bottom:24px;font-family:'Rajdhani',sans-serif;font-weight:700;
+  letter-spacing:1px;background:linear-gradient(90deg,#00ff88,#00c8ff 55%,#ff4444);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 40px rgba(0,255,136,0.25);
+}
+h2{font-size:30px;margin-bottom:20px;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:.5px;}
+#gameOver{background:rgba(5,5,8,0.9);z-index:40;backdrop-filter:blur(4px);}
 
 #eloResult{
   position:absolute;top:50%;left:50%;
   transform:translate(-50%,-50%) scale(0);
-  font-size:80px;font-weight:bold;text-align:center;
+  font-size:80px;font-weight:800;text-align:center;font-family:'Rajdhani',sans-serif;
   pointer-events:none;opacity:0;
   text-shadow:0 0 30px currentColor;z-index:100;
 }
@@ -256,73 +295,94 @@ h2{font-size:30px;margin-bottom:20px;}
   100%{transform:translate(-50%,-80%) scale(0.8);opacity:0;}
 }
 
-#vsScreen{background:#0a0a0a;z-index:60;}
-.vs-name{font-size:44px;font-weight:bold;text-align:center;}
-.vs-elo{font-size:22px;color:#aaa;margin-top:6px;}
-.vs-divider{font-size:60px;font-weight:900;color:#ff4444;margin:0 30px;text-shadow:0 0 30px #ff4444;}
-#vsCountdown{font-size:36px;margin-top:40px;color:#ffd700;}
+#vsScreen{background:radial-gradient(circle at 50% 50%, #101016, #050507 80%);z-index:60;}
+.vs-name{font-size:44px;font-weight:700;text-align:center;font-family:'Rajdhani',sans-serif;}
+.vs-elo{font-size:22px;color:#9aa0aa;margin-top:6px;}
+.vs-divider{font-size:60px;font-weight:900;color:#ff4444;margin:0 30px;text-shadow:0 0 30px #ff4444;font-family:'Rajdhani',sans-serif;}
+#vsCountdown{font-size:36px;margin-top:40px;color:#ffd700;font-family:'Rajdhani',sans-serif;font-weight:600;text-shadow:0 0 20px rgba(255,215,0,0.35);}
 #vsContainer{display:flex;align-items:center;justify-content:center;}
 
-#winnerOverlay{background:rgba(0,0,0,0.88);z-index:55;}
-#winnerOverlay h2{font-size:52px;font-weight:900;text-shadow:0 0 40px gold;}
+#winnerOverlay{background:rgba(5,5,8,0.92);z-index:55;backdrop-filter:blur(4px);}
+#winnerOverlay h2{font-size:52px;font-weight:900;text-shadow:0 0 40px gold;font-family:'Rajdhani',sans-serif;}
 #winnerOverlay p{font-size:26px;color:#aaa;margin-top:10px;}
 
 #eloTable{
   position:absolute;top:20px;right:20px;
-  background:rgba(0,0,0,0.55);padding:6px 8px;
+  background:rgba(12,12,18,0.65);padding:10px 12px;
   color:white;width:180px;max-height:60vh;overflow-y:auto;
-  border-radius:8px;display:none;font-size:12px;line-height:1.2;z-index:20;
+  border-radius:12px;display:none;font-size:12px;line-height:1.3;z-index:20;
+  border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(8px);
+  box-shadow:0 6px 20px rgba(0,0,0,0.35);
 }
 
-#profileModal{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.85);z-index:200;justify-content:center;align-items:center;}
-#profileCard{background:#1a1a2e;border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:28px 36px;color:white;min-width:300px;max-width:380px;position:relative;}
+#profileModal{display:none;position:absolute;inset:0;background:rgba(3,3,6,0.82);z-index:200;justify-content:center;align-items:center;backdrop-filter:blur(4px);}
+#profileCard{
+  background:linear-gradient(160deg,#191927,#111119);
+  border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:28px 36px;
+  color:white;min-width:300px;max-width:380px;position:relative;
+  box-shadow:0 20px 50px rgba(0,0,0,0.5);
+}
 #profileCard h2{margin-bottom:16px;font-size:26px;}
 .prof-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);}
-.prof-label{color:#aaa;font-size:15px;}
-.prof-val{font-size:15px;font-weight:bold;}
-#profileClose{position:absolute;top:12px;right:16px;cursor:pointer;font-size:22px;color:#aaa;}
+.prof-label{color:#9aa0aa;font-size:15px;}
+.prof-val{font-size:15px;font-weight:bold;color:#00ff88;}
+#profileClose{position:absolute;top:12px;right:16px;cursor:pointer;font-size:22px;color:#9aa0aa;transition:color .15s;}
+#profileClose:hover{color:#fff;}
 
 #coinHUD{
   display:none;position:absolute;top:20px;left:50%;transform:translateX(-50%);
-  color:white;font-size:28px;font-weight:bold;
-  background:rgba(0,0,0,0.6);padding:10px 24px;border-radius:12px;
+  color:#ffd700;font-size:28px;font-weight:700;font-family:'Rajdhani',sans-serif;
+  background:rgba(10,12,20,0.6);padding:10px 24px;border-radius:14px;
   text-align:center;z-index:20;pointer-events:none;
+  border:1px solid rgba(255,215,0,0.25);backdrop-filter:blur(6px);
+  text-shadow:0 0 14px rgba(255,215,0,0.4);
 }
 
-#onlineStatus{font-size:18px;color:#aaa;margin-bottom:20px;}
+#onlineStatus{font-size:18px;color:#9aa0aa;margin-bottom:20px;}
 
-#lbTable{width:400px;max-height:60vh;overflow-y:auto;margin-top:14px;}
-.lb-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.08);font-size:16px;}
-.lb-row:first-child{font-weight:bold;color:#ffd700;}
-.lb-me{background:rgba(0,255,136,0.1);}
+#lbTable{width:400px;max-height:60vh;overflow-y:auto;margin-top:14px;border-radius:12px;overflow-x:hidden;}
+.lb-row{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:16px;}
+.lb-row:first-child{font-weight:bold;color:#ffd700;background:rgba(255,215,0,0.06);}
+.lb-me{background:rgba(0,255,136,0.12);}
 
-input[type=text],input[type=number]{
+input[type=text],input[type=number],select{
   padding:12px 18px;font-size:18px;border-radius:10px;
-  border:1px solid #555;background:#222;color:white;
-  width:260px;margin:8px 0;
+  border:1px solid rgba(255,255,255,0.15);background:#15151d;color:white;
+  width:260px;margin:8px 0;font-family:'Sora',sans-serif;
+  transition:border-color .15s;
 }
-#accountInfo{font-size:16px;color:#aaa;margin-top:8px;}
+input[type=text]:focus,input[type=number]:focus,select:focus{
+  outline:none;border-color:rgba(0,255,136,0.45);
+}
+#accountInfo{font-size:16px;color:#9aa0aa;margin-top:8px;}
 
 #opponentInfo,#spectatorInfo{
   position:absolute;bottom:20px;left:20px;color:white;font-size:18px;
-  background:rgba(0,0,0,0.65);padding:15px 20px;border-radius:12px;
-  display:none;line-height:1.6;border:1px solid rgba(255,255,255,0.15);z-index:20;
+  background:rgba(10,12,20,0.7);padding:15px 20px;border-radius:14px;
+  display:none;line-height:1.6;border:1px solid rgba(255,255,255,0.12);z-index:20;
+  backdrop-filter:blur(6px);box-shadow:0 6px 20px rgba(0,0,0,0.35);
 }
 
 #pingDisplay{
-  position:absolute;top:20px;right:210px;color:#aaa;font-size:13px;
-  background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:8px;
-  display:none;z-index:20;pointer-events:none;
+  position:absolute;top:20px;right:210px;color:#9aa0aa;font-size:13px;
+  background:rgba(10,12,20,0.55);padding:5px 12px;border-radius:10px;
+  display:none;z-index:20;pointer-events:none;border:1px solid rgba(255,255,255,0.08);
 }
 
 #onlineHUD{
   position:absolute;top:20px;left:50%;transform:translateX(-50%);
   display:none;flex-direction:column;align-items:center;
-  background:rgba(0,0,0,0.7);padding:8px 20px;border-radius:12px;
+  background:rgba(10,12,20,0.72);padding:10px 24px;border-radius:14px;
   color:white;font-size:16px;z-index:20;pointer-events:none;
-  border:1px solid rgba(255,255,255,0.15);
+  border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(8px);
+  box-shadow:0 6px 20px rgba(0,0,0,0.35);
 }
-.online-names{display:flex;gap:20px;font-size:20px;font-weight:bold;}
+.online-names{display:flex;gap:20px;font-size:20px;font-weight:bold;font-family:'Rajdhani',sans-serif;}
+
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,255,136,0.35);}
 </style>
 </head>
 <body>
