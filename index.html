@@ -450,6 +450,53 @@ input[type=text]:focus,input[type=number]:focus,select:focus{
 label{font-family:var(--font-display);letter-spacing:.4px;color:var(--text-dim);}
 #accountInfo{font-size:16px;color:var(--text-dim);margin-top:8px;}
 
+/* ── Ball color picker ───────────────────────── */
+#ballColorRow{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  flex-wrap:wrap;max-width:300px;margin:10px 0 4px;
+}
+.color-swatch{
+  width:34px;height:34px;border-radius:50%;cursor:pointer;
+  border:2px solid rgba(255,255,255,0.15);
+  box-shadow:0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  padding:0;margin:0;
+}
+.color-swatch:hover{transform:scale(1.12);}
+.color-swatch.active{
+  border-color:#fff;
+  transform:scale(1.15);
+  box-shadow:0 0 0 3px rgba(255,255,255,0.18), 0 2px 12px rgba(0,0,0,0.5);
+}
+#ballColorCustom{
+  width:34px;height:34px;padding:0;border-radius:50%;border:2px dashed rgba(255,255,255,0.35);
+  background:transparent;cursor:pointer;overflow:hidden;
+}
+#ballColorCustom::-webkit-color-swatch-wrapper{padding:0;border-radius:50%;}
+#ballColorCustom::-webkit-color-swatch{border:none;border-radius:50%;}
+#ballPreviewWrap{
+  display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:6px;
+}
+#ballPreviewCanvas{
+  border-radius:14px;background:#0a0a10;border:1px solid var(--line);
+}
+
+/* ── Toggle switch (trail effect) ───────────────── */
+.switch{position:relative;display:inline-block;width:52px;height:28px;vertical-align:middle;margin:8px 0;}
+.switch input{opacity:0;width:0;height:0;}
+.switch .slider{
+  position:absolute;cursor:pointer;inset:0;border-radius:28px;
+  background:#20202c;border:1px solid var(--line);
+  transition:background .2s ease, border-color .2s ease;
+}
+.switch .slider::before{
+  content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;
+  border-radius:50%;background:#8b93a6;
+  transition:transform .2s ease, background .2s ease;
+}
+.switch input:checked + .slider{background:rgba(0,255,136,0.18);border-color:rgba(0,255,136,0.5);}
+.switch input:checked + .slider::before{transform:translateX(24px);background:var(--neon-green);box-shadow:0 0 8px rgba(0,255,136,0.7);}
+
 #opponentInfo,#spectatorInfo{
   position:absolute;bottom:20px;left:20px;color:white;font-size:18px;
   background:linear-gradient(160deg, rgba(16,18,26,0.78), rgba(8,9,14,0.78));
@@ -556,6 +603,20 @@ label{font-family:var(--font-display);letter-spacing:.4px;color:var(--text-dim);
         <option value="points" selected>Points</option>
         <option value="elo">ELO</option>
       </select><br><br>
+
+      <label>Your Ball Color</label>
+      <div id="ballPreviewWrap">
+        <canvas id="ballPreviewCanvas" width="90" height="90"></canvas>
+      </div>
+      <div id="ballColorRow"></div>
+      <br>
+
+      <label>Ball Trail Effect ✨</label><br>
+      <label class="switch">
+        <input type="checkbox" id="ballTrailToggle" onchange="setBallTrail(this.checked)">
+        <span class="slider"></span>
+      </label><br><br>
+
       <button onclick="saveSettings()">Save</button>
       <button onclick="showScreen('menu')">← Back</button>
     </div>
@@ -1151,7 +1212,88 @@ const ONLINE_START_BALLS = 0;
 const ONLINE_SPAWN_MS    = 1000;
 const ONLINE_BALL_SPEED  = 0.5;
 
-function openSettings() { showScreen("settings"); }
+// ═══════════════════════════════════════════════
+//  BALL COLOR + TRAIL (persisted to localStorage)
+// ═══════════════════════════════════════════════
+const BALL_COLOR_PRESETS = ["#00ff88","#00c8ff","#ff4444","#ffd700","#ff88aa","#a855f7","#ffffff","#ff8844"];
+let myBallColor      = localStorage.getItem("dobBallColor") || "#00ff88";
+let ballTrailEnabled = localStorage.getItem("dobBallTrail") !== "0";
+let myTrail = [];
+
+function isLocalPlayer(p) {
+  if (!p) return false;
+  if (p.name === "Player" || p.name === "YOU" || p.name === "Player 1") return true;
+  if (mode === "online" && onlineAccount && p.name === onlineAccount.name) return true;
+  return false;
+}
+
+function setBallColor(color) {
+  myBallColor = color;
+  localStorage.setItem("dobBallColor", color);
+  renderBallColorUI();
+}
+
+function setBallTrail(enabled) {
+  ballTrailEnabled = enabled;
+  localStorage.setItem("dobBallTrail", enabled ? "1" : "0");
+  if (!enabled) myTrail = [];
+}
+
+function renderBallColorUI() {
+  const row = document.getElementById("ballColorRow");
+  if (!row) return;
+  row.innerHTML = "";
+  for (const c of BALL_COLOR_PRESETS) {
+    const sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "color-swatch" + (c.toLowerCase() === myBallColor.toLowerCase() ? " active" : "");
+    sw.style.background = c;
+    sw.title = c;
+    sw.onclick = () => setBallColor(c);
+    row.appendChild(sw);
+  }
+  const isCustom = !BALL_COLOR_PRESETS.some(c => c.toLowerCase() === myBallColor.toLowerCase());
+  const customInput = document.createElement("input");
+  customInput.type = "color";
+  customInput.id = "ballColorCustom";
+  customInput.title = "Custom color";
+  customInput.value = isCustom ? myBallColor : "#ffffff";
+  if (isCustom) customInput.classList.add("active");
+  customInput.oninput = (e) => setBallColor(e.target.value);
+  row.appendChild(customInput);
+
+  const trailToggle = document.getElementById("ballTrailToggle");
+  if (trailToggle) trailToggle.checked = ballTrailEnabled;
+
+  drawBallPreview();
+}
+
+function drawBallPreview() {
+  const cvs = document.getElementById("ballPreviewCanvas");
+  if (!cvs) return;
+  const pctx = cvs.getContext("2d");
+  pctx.clearRect(0, 0, cvs.width, cvs.height);
+  const cx = cvs.width / 2, cy = cvs.height / 2;
+  if (ballTrailEnabled) {
+    for (let i = 3; i >= 1; i--) {
+      pctx.beginPath();
+      pctx.arc(cx - i * 9, cy, 16 - i * 3, 0, Math.PI * 2);
+      pctx.fillStyle = myBallColor;
+      pctx.globalAlpha = 0.12 * (4 - i);
+      pctx.fill();
+    }
+    pctx.globalAlpha = 1;
+  }
+  pctx.beginPath();
+  pctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  pctx.fillStyle = myBallColor;
+  pctx.shadowColor = myBallColor;
+  pctx.shadowBlur = 18;
+  pctx.fill();
+  pctx.shadowBlur = 0;
+}
+
+function openSettings() { showScreen("settings"); renderBallColorUI(); }
 function saveSettings() {
   startBallCount      = Number(document.getElementById("startBalls").value);
   spawnDelay          = Number(document.getElementById("spawnTime").value) * 1000;
@@ -1820,14 +1962,15 @@ function startOnlineGame(matchData) {
   startTime = Date.now();
   onlineResultHandled = false;
   onlineSimTick = 0;
+  myTrail = [];
 
   onlineRng            = makeLCG(matchData.seed || 42);
   onlineBallSpawnTimer = Date.now();
 
   document.getElementById("mode").textContent = onlineVsBot ? "Online 1v1 (Bot)" : "Online 1v1";
 
-  const myColor  = onlineRole === "p1" ? "#00ff88" : "#ff8844";
-  const oppColor = onlineRole === "p1" ? "#ff8844" : "#00ff88";
+  const myColor  = myBallColor;
+  const oppColor = myBallColor.toLowerCase() === "#ff8844" ? "#00c8ff" : "#ff8844";
   const myName   = onlineAccount.name;
   const oppName  = onlineOpponent.name;
   const scoreHUD = document.getElementById("onlineScoreHUD");
@@ -2503,7 +2646,7 @@ function startCoinMode() {
   document.getElementById("coinTime").textContent  = 60;
 
   players = [];
-  players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
+  players.push(createPlayer(W()/2, H()/2, myBallColor, "Player"));
   for (let i = 0; i < aiBotCount; i++)
     players.push(createPlayer(Math.random()*W(), Math.random()*H(),
       `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
@@ -2511,6 +2654,7 @@ function startCoinMode() {
   for (const p of players) {
     p.coinsCollected = 0;
   }
+  myTrail = [];
 
   for (let i = 0; i < 8; i++) spawnCoin();
   for (let i = 0; i < startBallCount; i++) createBall();
@@ -2536,10 +2680,11 @@ function startCoinMode() {
 function startSurvivalMode() {
   mode = "survival"; survivalWave = 1;
   players = [];
-  players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
+  players.push(createPlayer(W()/2, H()/2, myBallColor, "Player"));
   for (let i = 0; i < aiBotCount; i++)
     players.push(createPlayer(Math.random()*W(), Math.random()*H(),
       `hsl(${i*360/aiBotCount},100%,50%)`, "Bot "+(i+1)));
+  myTrail = [];
   for (let i = 0; i < startBallCount; i++) createBall();
   survivalIntervalId = setInterval(() => {
     if (!running) { clearInterval(survivalIntervalId); survivalIntervalId = null; return; }
@@ -2553,8 +2698,8 @@ function startSurvivalMode() {
 //  MIRROR DUEL
 // ═══════════════════════════════════════════════
 function startMirrorMode() {
-  mode = "mirror"; players = []; mirrorBot = null;
-  const me = createPlayer(W() * 0.3, H() / 2, "#00ff88", "YOU");
+  mode = "mirror"; players = []; mirrorBot = null; myTrail = [];
+  const me = createPlayer(W() * 0.3, H() / 2, myBallColor, "YOU");
   mirrorBot = createPlayer(W() * 0.7, H() / 2, "#ff88aa", "Mirror");
   const s = 0.5 + Math.random() * 0.4;
   mirrorBot.skill      = { aim:s, reaction:s, movement:s, awareness:s, aggression:s };
@@ -2575,7 +2720,7 @@ function startGame(selectedMode) {
   waitingQueue = []; matches = []; playerMatchMap.clear();
   spectateModeActive = false; spectateMatchId = null;
   followMode = "none"; targetName = null; humanRemovedFromQueue = false;
-  coins = []; mirrorBot = null;
+  coins = []; mirrorBot = null; myTrail = [];
 
   document.getElementById("coinHUD").style.display       = "none";
   document.getElementById("opponentInfo").style.display  = "none";
@@ -2607,9 +2752,10 @@ function startGame(selectedMode) {
   }
 
   if (mode === "single") {
-    if (!ranking.find(x => x.name === "Player"))
-      ranking.push({ name:"Player", color:"#00ff88", points:0, elo:1500, lastChange:0 });
-    players.push(createPlayer(W()/2, H()/2, "#00ff88", "Player"));
+    const rankedMe = ranking.find(x => x.name === "Player");
+    if (!rankedMe) ranking.push({ name:"Player", color:myBallColor, points:0, elo:1500, lastChange:0 });
+    else rankedMe.color = myBallColor;
+    players.push(createPlayer(W()/2, H()/2, myBallColor, "Player"));
     for (const bot of ranking) {
       if (bot.name === "Player") continue;
       const nb = createPlayer(Math.random()*W(), Math.random()*H(), bot.color, bot.name);
@@ -2621,7 +2767,7 @@ function startGame(selectedMode) {
 
   } else if (mode === "multi") {
     players.push(
-      createPlayer(200, 200, "#00ff88", "Player 1"),
+      createPlayer(200, 200, myBallColor, "Player 1"),
       createPlayer(400, 200, "#4488ff", "Player 2")
     );
     for (let i = 0; i < aiBotCount; i++)
@@ -2663,10 +2809,10 @@ function hideAllScreensForGame() {
 //  security rewrite, kept as-is)
 // ═══════════════════════════════════════════════
 function startTournament() {
-  running = true; matches = []; participants = []; waitingQueue = [];
+  running = true; matches = []; participants = []; waitingQueue = []; myTrail = [];
   humanRemovedFromQueue = false; recentOpponents.clear();
 
-  const me = createPlayer(W()/2, H()/2, "#00ff88", "YOU");
+  const me = createPlayer(W()/2, H()/2, myBallColor, "YOU");
   participants.push(me);
 
   const skillList = Array.from({length: aiBotCount}, (_, i) => (i+1)/aiBotCount);
@@ -3495,6 +3641,26 @@ oppDiv.innerHTML = `<b>Opponent: ${opp.name}</b><br>Rank: <b>#${oppRank}</b> of 
   for (const b of balls) {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI*2);
     ctx.fillStyle = "#ff4444"; ctx.fill();
+  }
+
+  if (ballTrailEnabled) {
+    const myP = players.find(isLocalPlayer);
+    if (myP && myP.alive) {
+      myTrail.push({ x: myP.x, y: myP.y });
+      if (myTrail.length > 14) myTrail.shift();
+    } else if (myTrail.length) {
+      myTrail.shift();
+    }
+    for (let i = 0; i < myTrail.length; i++) {
+      const t = myTrail[i];
+      const progress = (i + 1) / myTrail.length;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, (myP ? myP.radius : 18) * 0.6 * progress, 0, Math.PI * 2);
+      ctx.fillStyle = myBallColor;
+      ctx.globalAlpha = 0.3 * progress;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   for (const p of players) {
