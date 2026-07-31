@@ -107,7 +107,9 @@
 
 import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged
+  getAuth, signInAnonymously, onAuthStateChanged,
+  setPersistence, browserLocalPersistence,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
 }                            from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, set, get, onValue, push, remove, update, serverTimestamp, onDisconnect }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -138,6 +140,12 @@ try {
   _db  = getDatabase(_app);
   _auth = getAuth(_app);
   try { getAnalytics(_app); } catch(e) {}
+  // ADDED: explicit LOCAL persistence. This is already the web SDK's
+  // default, but we set it explicitly so the session survives tab
+  // closes / browser restarts on the SAME device — it does NOT make
+  // an account follow you to a different device/browser; only
+  // signing in with username+password (below) does that.
+  try { setPersistence(_auth, browserLocalPersistence); } catch(e) {}
   _fbReady = true;
   console.log("Firebase connected!");
 } catch(e) {
@@ -175,7 +183,13 @@ if (_fbReady) {
       _authReadyResolvers.forEach(r => r(_myUid));
       _authReadyResolvers = [];
     } else {
-      // Not signed in yet — try anonymous sign-in.
+      // CHANGED: clear the stale uid immediately so nothing briefly
+      // acts under a uid we no longer own (e.g. right after logout,
+      // before the fresh anonymous sign-in below resolves).
+      _myUid = null;
+      window._dobReady = false;
+      // Not signed in yet (or just logged out) — fall back to an
+      // anonymous session so guest/offline features keep working.
       try { await signInAnonymously(_auth); }
       catch(e) { console.warn("Anonymous sign-in failed", e); }
     }
@@ -190,6 +204,61 @@ if (_fbReady) {
 // handles.
 window.dobIsReady = () => _fbReady && _authReady && !!_myUid;
 window.dobMyUid   = () => _myUid;
+
+// ═══════════════════════════════════════════════════════════════════
+// ADDED: real username+password accounts.
+//
+// Why this uses Firebase's built-in Email/Password auth instead of
+// hand-rolled hashing: Firebase Auth's servers hash and salt the
+// password themselves (scrypt) before it ever gets stored — the raw
+// password never touches the Realtime Database, and neither does any
+// hash we'd compute ourselves. A client-side hash-and-store-in-RTDB
+// scheme is strictly worse: it teaches the client the hash, it's easy
+// to get wrong (weak algorithm, no per-user salt), and anyone with DB
+// read access could copy the hash. Piggybacking on Firebase Auth
+// gives real security AND is what actually makes an account portable
+// to a new device: signing in with username+password re-derives the
+// SAME uid anywhere, whereas anonymous auth hands out a NEW uid tied
+// to the local browser/device every time.
+//
+// A fixed fake domain turns "username" into an email Firebase Auth
+// will accept, without needing a real email address from the player.
+function usernameToEmail(username) {
+  const clean = String(username).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return clean + "@darkonballs.local";
+}
+
+async function dobRegisterWithPassword(username, password) {
+  if (!_fbReady) throw new Error("Firebase not ready.");
+  const email = usernameToEmail(username);
+  const cred = await createUserWithEmailAndPassword(_auth, email, password);
+  return cred.user.uid;
+}
+
+async function dobLoginWithPassword(username, password) {
+  if (!_fbReady) throw new Error("Firebase not ready.");
+  const email = usernameToEmail(username);
+  const cred = await signInWithEmailAndPassword(_auth, email, password);
+  return cred.user.uid;
+}
+
+async function dobLogout() {
+  if (!_fbReady) return;
+  await signOut(_auth); // onAuthStateChanged (above) picks this up and re-signs-in anonymously
+}
+
+function dobIsPasswordAccount() {
+  return !!(_auth && _auth.currentUser && !_auth.currentUser.isAnonymous);
+}
+
+// Same pattern as window._dobRPC: only narrow, purpose-built functions
+// are exposed, never the raw auth object.
+window._dobAuth = {
+  register: dobRegisterWithPassword,
+  login: dobLoginWithPassword,
+  logout: dobLogout,
+  isPasswordAccount: dobIsPasswordAccount
+};
 </script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -437,13 +506,13 @@ h2::after{
 .lb-me{background:rgba(0,255,136,0.14);}
 .lb-me:hover{background:rgba(0,255,136,0.14);}
 
-input[type=text],input[type=number],select{
+input[type=text],input[type=number],input[type=password],select{
   padding:12px 18px;font-size:18px;border-radius:10px;
   border:1px solid var(--line);background:#15151d;color:white;
   width:260px;margin:8px 0;font-family:var(--font-body);
   transition:border-color .15s, box-shadow .15s;
 }
-input[type=text]:focus,input[type=number]:focus,select:focus{
+input[type=text]:focus,input[type=number]:focus,input[type=password]:focus,select:focus{
   outline:none;border-color:rgba(0,255,136,0.5);
   box-shadow:0 0 0 3px rgba(0,255,136,0.12);
 }
@@ -578,6 +647,7 @@ label{font-family:var(--font-display);letter-spacing:.4px;color:var(--text-dim);
         <button onclick="startGame('tournament')">1vs1 Tournament (Offline)</button>
         <button onclick="startGame('coin')">🪙 Coin Hunt</button>
         <button onclick="showScreen('leaderboardScreen');loadLeaderboard()">🏆 Leaderboard</button>
+        <button onclick="openAccountScreen()">👤 Account</button>
         <button onclick="openSettings()">Settings</button>
       </div>
     </div>
@@ -1541,37 +1611,169 @@ function showScreen_onlineFlow() {
   else enterOnlineQueue();
 }
 
-function showCreateAccount() {
+// CHANGED: accounts are now real username+password accounts (backed
+// by Firebase Auth's email/password provider — see the top of the
+// file for why). showCreateAccount() is kept as a thin wrapper for
+// old call sites; the actual UI now has a Register / Log In toggle,
+// plus a logged-in status screen with a Log Out button.
+function showCreateAccount() { showAccountAuthScreen("register"); }
+
+function showAccountAuthScreen(mode) {
+  showScreen("accountScreen");
+  if (mode === "login") {
+    document.getElementById("accountContent").innerHTML = `
+      <p style="color:#aaa;margin-bottom:18px;font-size:16px;">Log in to your account</p>
+      <input type="text" id="authUsername" placeholder="Username" maxlength="20" autocomplete="username">
+      <br>
+      <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
+      <br>
+      <div id="accountInfo"></div>
+      <br>
+      <button onclick="loginAccount()">Log In</button>
+      <button onclick="showAccountAuthScreen('register')">Need an account? Create one</button>
+      <button onclick="showScreen('menu')">← Back</button>
+    `;
+  } else {
+    document.getElementById("accountContent").innerHTML = `
+      <p style="color:#aaa;margin-bottom:18px;font-size:16px;">Create your account</p>
+      <input type="text" id="authUsername" placeholder="Username" maxlength="20" autocomplete="username">
+      <br>
+      <input type="password" id="authPassword" placeholder="Password (min 6 characters)" autocomplete="new-password">
+      <br>
+      <input type="password" id="authPasswordConfirm" placeholder="Confirm password" autocomplete="new-password">
+      <br>
+      <div id="accountInfo"></div>
+      <br>
+      <button onclick="createAccount()">Create Account</button>
+      <button onclick="showAccountAuthScreen('login')">Already have an account? Log In</button>
+      <button onclick="showScreen('menu')">← Back</button>
+    `;
+  }
+}
+
+function showLoggedInAccountScreen() {
   showScreen("accountScreen");
   document.getElementById("accountContent").innerHTML = `
-    <p style="color:#aaa;margin-bottom:18px;font-size:16px;">Choose your username</p>
-    <input type="text" id="newUsername" placeholder="Username" maxlength="20">
-    <br>
-    <div id="accountInfo"></div>
-    <br>
-    <button onclick="createAccount()">Create Account</button>
+    <p style="color:#aaa;margin-bottom:8px;font-size:16px;">Logged in as</p>
+    <p style="color:#00ff88;font-size:22px;font-weight:700;margin-bottom:18px;">${onlineAccount.name}</p>
+    <button onclick="logoutAccount()">Log Out</button>
     <button onclick="showScreen('menu')">← Back</button>
   `;
 }
 
-// CHANGED: the uniqueness check now looks up the `usernames` index
-// (name → uid) instead of `players/{name}`. The account object itself
-// is created locally and pushed via pushAccountToFirebase(), which
-// writes to players/{myUid} — never to a name-keyed path.
-async function createAccount() {
-  const name = document.getElementById("newUsername").value.trim();
-  const info = document.getElementById("accountInfo");
-  if (!name || name.length < 2)           { info.textContent = "Name must be at least 2 characters."; info.style.color="#f44"; return; }
-  if (!/^[a-zA-Z0-9_-]+$/.test(name))     { info.textContent = "Only letters, numbers, _ and - allowed."; info.style.color="#f44"; return; }
-  if (!myUid) { info.textContent = "Still connecting — please try again in a moment."; info.style.color="#f44"; return; }
-  if (fbReady) {
-    const existingUid = await dbGet("usernames/" + name.toLowerCase());
-    if (existingUid && existingUid !== myUid) { info.textContent = "Name already taken."; info.style.color="#f44"; return; }
+// Entry point for the new "👤 Account" menu button: shows the right
+// screen depending on whether we're already logged into a real
+// (password-backed) account.
+function openAccountScreen() {
+  if (onlineAccount && window._dobAuth && window._dobAuth.isPasswordAccount()) {
+    showLoggedInAccountScreen();
+  } else {
+    showAccountAuthScreen("register");
   }
-  onlineAccount = { name, elo: 1500, wins: 0, losses: 0 };
-  saveAccountLocal();
-  if (fbReady) await pushAccountToFirebase();
-  enterOnlineQueue();
+}
+
+// CHANGED: registration now requires a password. The uniqueness check
+// still looks up the `usernames` index first (fast, friendly error),
+// but the real guarantee comes from Firebase Auth itself refusing a
+// duplicate email (auth/email-already-in-use) — the two can't
+// disagree for long since both are written together.
+async function createAccount() {
+  const name            = document.getElementById("authUsername").value.trim();
+  const password         = document.getElementById("authPassword").value;
+  const passwordConfirm  = document.getElementById("authPasswordConfirm").value;
+  const info = document.getElementById("accountInfo");
+
+  if (!name || name.length < 2)          { info.textContent = "Name must be at least 2 characters."; info.style.color="#f44"; return; }
+  if (!/^[a-zA-Z0-9_-]+$/.test(name))    { info.textContent = "Only letters, numbers, _ and - allowed."; info.style.color="#f44"; return; }
+  if (!password || password.length < 6)  { info.textContent = "Password must be at least 6 characters."; info.style.color="#f44"; return; }
+  if (password !== passwordConfirm)      { info.textContent = "Passwords do not match."; info.style.color="#f44"; return; }
+  if (!fbReady || !window._dobAuth)      { info.textContent = "Still connecting — please try again in a moment."; info.style.color="#f44"; return; }
+
+  info.style.color = "#aaa";
+  info.textContent = "Creating account…";
+
+  try {
+    const existingUid = await dbGet("usernames/" + name.toLowerCase());
+    if (existingUid) { info.textContent = "Name already taken."; info.style.color="#f44"; return; }
+
+    const newUid = await window._dobAuth.register(name, password);
+    myUid = newUid;
+
+    onlineAccount = { name, elo: 1500, wins: 0, losses: 0 };
+    saveAccountLocal();
+    await pushAccountToFirebase();
+    RPC.onDisconnectSetOwnStatus({ status: "offline" });
+    await updatePlayerStatus("Idle in Menu");
+    startMenuPresenceListener();
+
+    enterOnlineQueue();
+  } catch(e) {
+    if (e && e.code === "auth/email-already-in-use") info.textContent = "Name already taken.";
+    else if (e && e.code === "auth/weak-password")   info.textContent = "Password is too weak (min 6 characters).";
+    else                                              info.textContent = "Could not create account. Please try again.";
+    info.style.color = "#f44";
+    console.warn("createAccount failed", e);
+  }
+}
+
+// ADDED: log in with an existing username+password. On success we
+// fetch the player's saved data from Firebase (NOT from localStorage
+// — this is what makes it work on a brand-new device/browser) and
+// use that as the account.
+async function loginAccount() {
+  const name     = document.getElementById("authUsername").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const info     = document.getElementById("accountInfo");
+
+  if (!name || !password)           { info.textContent = "Enter your username and password."; info.style.color="#f44"; return; }
+  if (!fbReady || !window._dobAuth) { info.textContent = "Still connecting — please try again in a moment."; info.style.color="#f44"; return; }
+
+  info.style.color = "#aaa";
+  info.textContent = "Logging in…";
+
+  try {
+    const uid = await window._dobAuth.login(name, password);
+    myUid = uid;
+
+    const data = await dbGet("players/" + uid);
+    if (data) {
+      onlineAccount = sanitizeAccount(data);
+    } else {
+      // Password account exists but has no player record yet (edge
+      // case) — start it fresh under this uid.
+      onlineAccount = { name, elo: 1500, wins: 0, losses: 0 };
+      await pushAccountToFirebase();
+    }
+    saveAccountLocal();
+    RPC.onDisconnectSetOwnStatus({ status: "offline" });
+    await updatePlayerStatus("Idle in Menu");
+    startMenuPresenceListener();
+
+    showScreen("menu");
+  } catch(e) {
+    if (e && ["auth/invalid-credential","auth/wrong-password","auth/user-not-found"].includes(e.code)) {
+      info.textContent = "Incorrect username or password.";
+    } else {
+      info.textContent = "Could not log in. Please try again.";
+    }
+    info.style.color = "#f44";
+    console.warn("loginAccount failed", e);
+  }
+}
+
+// ADDED: log out and drop back to guest/anonymous mode. Local account
+// data is cleared so the account screen doesn't show stale info.
+async function logoutAccount() {
+  try {
+    cleanupOnline();
+    if (fbReady && myUid) { RPC.updateOwnPlayer({ status: "offline" }).catch(() => {}); }
+    if (window._dobAuth) await window._dobAuth.logout();
+  } catch(e) {
+    console.warn("logoutAccount failed", e);
+  }
+  onlineAccount = null;
+  localStorage.removeItem("dobAccount");
+  showScreen("menu");
 }
 
 function enterOnlineQueue() {
